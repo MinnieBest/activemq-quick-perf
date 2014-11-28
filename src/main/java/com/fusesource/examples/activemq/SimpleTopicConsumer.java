@@ -33,25 +33,27 @@ public class SimpleTopicConsumer {
 	private static final String DESTINATION_NAME = "simple";
 	private static final int MESSAGE_TIMEOUT_MILLISECONDS = 60000;
 	private static final int NUM_MESSAGES_TO_BE_RECEIVED = 100;
+	private static final String CLIENT_ID = "1";
+	private static final String SUBSCRIPTION_NAME = "topicTest";
 
 	public static void main(String args[]) {
 		TopicConnection connection = null;
 
 		try {
 			// JNDI lookup of JMS Connection Factory and JMS Destination
-			Context context = new InitialContext();
+			Context context = new InitialContext();			
 			TopicConnectionFactory factory = (TopicConnectionFactory) context
 					.lookup(CONNECTION_FACTORY_NAME);
 			Topic topic = (Topic) context.lookup(DESTINATION_NAME);
 
 			connection = factory.createTopicConnection();
-			connection.setClientID("1");
+			connection.setClientID(CLIENT_ID);
 			connection.start();
 
 			TopicSession session = connection.createTopicSession(
 					NON_TRANSACTED, Session.AUTO_ACKNOWLEDGE);
 			TopicSubscriber consumer = session.createDurableSubscriber(topic,
-					"topicTest");
+					SUBSCRIPTION_NAME);
 
 			LOG.info("Start consuming messages from {} with {} ms timeout",
 					topic.toString(), MESSAGE_TIMEOUT_MILLISECONDS);
