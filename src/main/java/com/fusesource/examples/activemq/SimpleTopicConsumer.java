@@ -17,8 +17,6 @@
 
 package com.fusesource.examples.activemq;
 
-import java.text.DecimalFormat;
-
 import javax.jms.*;
 import javax.naming.Context;
 import javax.naming.InitialContext;
@@ -26,67 +24,73 @@ import javax.naming.InitialContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class SimpleProducer {
+public class SimpleTopicConsumer {
 	private static final Logger LOG = LoggerFactory
 			.getLogger(SimpleProducer.class);
 
 	private static final Boolean NON_TRANSACTED = false;
-	private static final long MESSAGE_TIME_TO_LIVE_MILLISECONDS = 0;
-	private static final int NUM_MESSAGES_TO_BE_SENT = 100;
 	private static final String CONNECTION_FACTORY_NAME = "myJmsFactory";
 	private static final String DESTINATION_NAME = "simple";
+	private static final int MESSAGE_TIMEOUT_MILLISECONDS = 60000;
+	private static final int NUM_MESSAGES_TO_BE_RECEIVED = 100;
 
 	public static void main(String args[]) {
-		Connection connection = null;
+		TopicConnection connection = null;
 
 		try {
 			// JNDI lookup of JMS Connection Factory and JMS Destination
 			Context context = new InitialContext();
-			ConnectionFactory factory = (ConnectionFactory) context
+			TopicConnectionFactory factory = (TopicConnectionFactory) context
 					.lookup(CONNECTION_FACTORY_NAME);
-			Destination destination = (Destination) context
-					.lookup(DESTINATION_NAME);
-			
+			Topic topic = (Topic) context.lookup(DESTINATION_NAME);
 
-			connection = factory.createConnection();
+			connection = factory.createTopicConnection();
+			connection.setClientID("1");
 			connection.start();
 
-			Session session = connection.createSession(NON_TRANSACTED,
-					Session.AUTO_ACKNOWLEDGE);
-			
-			MessageProducer producer = session.createProducer(destination);
+			TopicSession session = connection.createTopicSession(
+					NON_TRANSACTED, Session.AUTO_ACKNOWLEDGE);
+			TopicSubscriber consumer = session.createDurableSubscriber(topic,
+					"topicTest");
 
-			producer.setTimeToLive(MESSAGE_TIME_TO_LIVE_MILLISECONDS);
-			producer.setDeliveryMode(DeliveryMode.PERSISTENT);
+			LOG.info("Start consuming messages from {} with {} ms timeout",
+					topic.toString(), MESSAGE_TIMEOUT_MILLISECONDS);
 
-			LOG.info("Starting to send {} messages to {}...",
-					NUM_MESSAGES_TO_BE_SENT, destination.toString());
-
-			final double start = System.currentTimeMillis();
-			for (int i = 1; i <= NUM_MESSAGES_TO_BE_SENT; i++) {
-				final TextMessage message = session.createTextMessage(i
-						+ ". message sent");
-				// LOG.debug("Sending to destination: {} this text: {}",
-				// destination.toString(), message.getText());
-				// final double item1 = System.currentTimeMillis();
-				producer.send(message);
-				// final double item2 = System.currentTimeMillis();
-				// LOG.info("Sent item {} in {} seconds ", new Object[] { i,
-				// ((item2 - item1) / 1000)});
+			double start = 0;
+			double stop = 0;
+			// Synchronous message consumer
+			int i;
+			int num = 0;
+			for (i = 0; i < NUM_MESSAGES_TO_BE_RECEIVED; i++) {
+				Message message = consumer
+						.receive(MESSAGE_TIMEOUT_MILLISECONDS);
+				if (message != null) {
+					if (message instanceof TextMessage) {
+						final String text = ((TextMessage) message).getText();
+						if (i == 0) {
+							start = System.currentTimeMillis();
+						}
+						num++;
+						stop = System.currentTimeMillis();
+						LOG.info("Got {}. message: {}", (i++), text);
+					}
+				} else {
+					LOG.info("#########");
+					break;
+				}
 			}
 
-			final double stop = System.currentTimeMillis();
+			// final double stop = System.currentTimeMillis();
+			// LOG.info("{}Received {} messages in {} seconds - throughput ",
+			// new Object[] { stop, i, ((stop - start) / 1000) });
+			LOG.info("Received {} messages in {} seconds - throughput {}",
+					new Object[] { num, ((stop - start) / 1000),
+							(num / ((stop - start) / 1000)) });
 
-			LOG.info("Sent {} messages in {} seconds - throughput {}",
-					new Object[] { NUM_MESSAGES_TO_BE_SENT,
-							((stop - start) / 1000),
-							(NUM_MESSAGES_TO_BE_SENT * 1000 / (stop - start)) });
-
-			// Cleanup
-			producer.close();
+			consumer.close();
 			session.close();
 		} catch (Throwable t) {
-			LOG.error("Error sending message", t);
+			LOG.error("Error receiving message", t);
 		} finally {
 			// Cleanup code
 			// In general, you should always close producers, consumers,

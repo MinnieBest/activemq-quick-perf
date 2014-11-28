@@ -25,71 +25,86 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 public class SimpleConsumer {
-    private static final Logger LOG = LoggerFactory.getLogger(SimpleProducer.class);
+	private static final Logger LOG = LoggerFactory
+			.getLogger(SimpleProducer.class);
 
-    private static final Boolean NON_TRANSACTED = false;
-    private static final String CONNECTION_FACTORY_NAME = "myJmsFactory";
-    private static final String DESTINATION_NAME = "queue/simple";
-    private static final int MESSAGE_TIMEOUT_MILLISECONDS = 120000;
-    private static final int NUM_MESSAGES_TO_BE_RECEIVED = 100000;
+	private static final Boolean NON_TRANSACTED = false;
+	private static final String CONNECTION_FACTORY_NAME = "myJmsFactory";
+	private static final String DESTINATION_NAME = "simple";
+	private static final int MESSAGE_TIMEOUT_MILLISECONDS = 60000;
+	private static final int NUM_MESSAGES_TO_BE_RECEIVED = 50;
 
-    public static void main(String args[]) {
-        Connection connection = null;
+	public static void main(String args[]) {
+		Connection connection = null;
 
-        try {
-            // JNDI lookup of JMS Connection Factory and JMS Destination
-            Context context = new InitialContext();
-            ConnectionFactory factory = (ConnectionFactory) context.lookup(CONNECTION_FACTORY_NAME);
-            Destination destination = (Destination) context.lookup(DESTINATION_NAME);
+		try {
+			// JNDI lookup of JMS Connection Factory and JMS Destination
+			Context context = new InitialContext();
+			ConnectionFactory factory = (ConnectionFactory) context
+					.lookup(CONNECTION_FACTORY_NAME);
+			Destination destination = (Destination) context
+					.lookup(DESTINATION_NAME);
 
-            connection = factory.createConnection();
-            connection.start();
+			connection = factory.createConnection();			
+			connection.start();
 
-            Session session = connection.createSession(NON_TRANSACTED, Session.AUTO_ACKNOWLEDGE);
-            MessageConsumer consumer = session.createConsumer(destination);
+			Session session = connection.createSession(NON_TRANSACTED,
+					Session.AUTO_ACKNOWLEDGE);
+			MessageConsumer consumer = session.createConsumer(destination);
+			
+			
 
-            LOG.info("Start consuming messages from {} with {} ms timeout", destination.toString(), MESSAGE_TIMEOUT_MILLISECONDS);
+			LOG.info("Start consuming messages from {} with {} ms timeout",
+					destination.toString(), MESSAGE_TIMEOUT_MILLISECONDS);
 
-            long start = 0;
+			double start = 0;
+			double stop=0;
+			// Synchronous message consumer
+			int i;
+			int num = 0;
+			for (i = 0; i < NUM_MESSAGES_TO_BE_RECEIVED; i++) {
+				Message message = consumer
+						.receive(MESSAGE_TIMEOUT_MILLISECONDS);
+				if (message != null) {
+					if (message instanceof TextMessage) {
+						final String text = ((TextMessage) message).getText();
+						if (i == 0) {
+							start = System.currentTimeMillis();
+						}
+						num++;
+						 stop = System.currentTimeMillis();
+						 LOG.info("Got {}. message: {}", (i++), text);
+					}
+				} else {
+					LOG.info("#########");
+					break;
+				}
+			}
 
-            // Synchronous message consumer
-            int i;
-            for (i = 0; i < NUM_MESSAGES_TO_BE_RECEIVED; i++) {
-                Message message = consumer.receive(MESSAGE_TIMEOUT_MILLISECONDS);
-                if (message != null) {
-                    if (message instanceof TextMessage) {
-                        final String text = ((TextMessage) message).getText();
-                        if (i == 0) {
-                            start = System.currentTimeMillis();
-                        }
-                        //LOG.debug("Got {}. message: {}", (i++), text);
-                    }
-                } else {
-                    break;
-                }
-            }
+//			final double stop = System.currentTimeMillis();
+			// LOG.info("{}Received {} messages in {} seconds - throughput ",
+			// new Object[] { stop, i, ((stop - start) / 1000) });
+			LOG.info("Received {} messages in {} seconds - throughput {}",
+					new Object[] { num, ((stop - start) / 1000),
+							(num / ((stop - start) / 1000)) });
 
-            final long stop = System.currentTimeMillis();
-
-            LOG.info("Received {} messages in {} seconds - throughput {}", new Object[] {i, ((stop - start)/1000), (i/((stop-start)/1000))});
-
-            consumer.close();
-            session.close();
-        } catch (Throwable t) {
-            LOG.error("Error receiving message", t);
-        } finally {
-            // Cleanup code
-            // In general, you should always close producers, consumers,
-            // sessions, and connections in reverse order of creation.
-            // For this simple example, a JMS connection.close will
-            // clean up all other resources.
-            if (connection != null) {
-                try {
-                    connection.close();
-                } catch (JMSException e) {
-                    LOG.error("Error closing connection", e);
-                }
-            }
-        }
-    }
+			consumer.close();
+			session.close();
+		} catch (Throwable t) {
+			LOG.error("Error receiving message", t);
+		} finally {
+			// Cleanup code
+			// In general, you should always close producers, consumers,
+			// sessions, and connections in reverse order of creation.
+			// For this simple example, a JMS connection.close will
+			// clean up all other resources.
+			if (connection != null) {
+				try {
+					connection.close();
+				} catch (JMSException e) {
+					LOG.error("Error closing connection", e);
+				}
+			}
+		}
+	}
 }
